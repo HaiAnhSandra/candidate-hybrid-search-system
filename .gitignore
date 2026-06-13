@@ -6,7 +6,7 @@ frontend/.env
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 .venv/
 venv/
 
@@ -24,3 +24,7 @@ uploads/
 # OS
 .DS_Store
 Thumbs.db
+node_modules/
+frontend/node_modules/
+__pycache__/
+*.py[cod]

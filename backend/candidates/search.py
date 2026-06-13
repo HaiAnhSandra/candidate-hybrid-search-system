@@ -644,11 +644,14 @@ async def search_candidates(query: SearchQuery, db: AsyncSession) -> SearchRespo
         try:
             import redis.asyncio as aioredis
 
-            redis_client = await aioredis.from_url(
+            redis_client = aioredis.from_url(
                 settings.REDIS_URL,
                 encoding="utf-8",
                 decode_responses=False,
+                socket_connect_timeout=2,
+                socket_timeout=2,
             )
+            await redis_client.ping()
             query_vector = await asyncio.get_running_loop().run_in_executor(
                 None, embed, query.raw_query
             )

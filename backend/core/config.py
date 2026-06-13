@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     TOP_K_RERANK: int = 10
     RRF_K: int = 60
     MAX_HARD_FILTER_RESULTS: int = 500
-    REDIS_URL: str = "redis://localhost:6379"
+    REDIS_URL: str = "redis://localhost:6379/0"
     DEVICE: str = "cpu"
 
 
