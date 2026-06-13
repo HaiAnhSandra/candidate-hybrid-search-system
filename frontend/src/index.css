@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #F5F7FA;
+    color: #1A202C;
+    font-family: theme("fontFamily.sans");
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+  }
+}
+
+@layer components {
+  .app-root {
+    min-height: 100vh;
+  }
+
+  .search-surface {
+    @apply relative overflow-hidden rounded-2xl border p-5;
+    background-color: #FFFFFF;
+    border-color: #E2E8F0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .search-surface input[type="text"],
+  .search-surface button[type="submit"] {
+    height: 56px !important;
+  }
+}
+
+@layer utilities {
+  .kanban-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .bg-accent {
+    --tw-bg-opacity: 1;
+    background-color: rgb(229 62 62 / var(--tw-bg-opacity));
+  }
+
+  .text-accent {
+    --tw-text-opacity: 1;
+    color: rgb(229 62 62 / var(--tw-text-opacity));
+  }
+
+  .border-accent {
+    --tw-border-opacity: 1;
+    border-color: rgb(229 62 62 / var(--tw-border-opacity));
+  }
+
+  .border-t-accent {
+    border-top-color: rgb(229 62 62 / var(--tw-border-opacity, 1));
+  }
+
+  .hover\:border-accent:hover {
+    border-color: rgb(229 62 62 / var(--tw-border-opacity, 1));
+  }
+
+  .hover\:text-accent:hover {
+    color: rgb(229 62 62 / var(--tw-text-opacity, 1));
+  }
+
+  .focus\:border-accent:focus {
+    border-color: rgb(229 62 62 / var(--tw-border-opacity, 1));
+  }
+
+  .bg-blue-50 {
+    --tw-bg-opacity: 1;
+    background-color: rgb(254 242 242 / var(--tw-bg-opacity));
+  }
+
+  .text-blue-700 {
+    --tw-text-opacity: 1;
+    color: rgb(185 28 28 / var(--tw-text-opacity));
+  }
+}
