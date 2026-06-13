@@ -81,7 +81,7 @@ def extract_name(text: str) -> tuple[str | None, str | None]:
     try:
         print(f"NER: extract_name input: '{text[:200]}'")
         import spacy
-        nlp = spacy.load("en_core_web_lg")
+        nlp = spacy.load("en_core_web_sm")
         
         text_for_ner = text[:500]
         if text_for_ner.isupper() or sum(1 for c in text_for_ner if c.isupper()) > len(text_for_ner) * 0.6:
@@ -174,7 +174,7 @@ def extract_location(text: str) -> str | None:
         # spaCy fallback
         import spacy
 
-        nlp = spacy.load("en_core_web_lg")
+        nlp = spacy.load("en_core_web_sm")
         doc = nlp(text_head)
 
         for ent in doc.ents:

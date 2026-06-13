@@ -22,7 +22,7 @@ def extract_skills_with_skillner(text: str) -> list[str]:
         from skillner import SkillExtractor
         from spacy.matcher import PhraseMatcher
 
-        nlp = spacy.load("en_core_web_lg")
+        nlp = spacy.load("en_core_web_sm")
         skill_extractor = SkillExtractor(nlp, "/path/to/emsi", PhraseMatcher)
 
         annotations = skill_extractor.annotate(text)
