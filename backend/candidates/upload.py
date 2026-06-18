@@ -227,21 +227,9 @@ async def confirm_save_candidate_cv(
 
     print("API: generating embeddings from edited candidate data")
 
-    holistic_vec = vec_to_str(
-        embed(candidate_data["holistic_summary_text"])
-        if candidate_data.get("holistic_summary_text")
-        else None
-    )
-    career_vec = vec_to_str(
-        embed(candidate_data["career_trajectory_text"])
-        if candidate_data.get("career_trajectory_text")
-        else None
-    )
-    experience_vec = vec_to_str(
-        embed(candidate_data["experience_block_text"])
-        if candidate_data.get("experience_block_text")
-        else None
-    )
+    holistic_vec = None
+    career_vec = None
+    experience_vec = None
 
     candidate_id = str(uuid.uuid4())
 
