@@ -3,7 +3,7 @@ from typing import AsyncGenerator
 from uuid import UUID
 
 import uvicorn
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
@@ -127,8 +127,16 @@ async def parse_preview_cv_endpoint(
 
 
 @app.post("/api/v1/candidates/confirm-save")
-async def confirm_save_cv_endpoint(request: ConfirmSaveRequest, db: AsyncSession = Depends(get_db)):
-    return await confirm_save_candidate_cv(request, db)
+async def confirm_save_cv_endpoint(
+    request: ConfirmSaveRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    return await confirm_save_candidate_cv(
+        request=request,
+        background_tasks=background_tasks,
+        db=db,
+    )
 
 
 if __name__ == "__main__":

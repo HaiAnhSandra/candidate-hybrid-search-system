@@ -1,14 +1,14 @@
 import uuid
+import asyncio
 
-from fastapi import Depends, Form, UploadFile
+from fastapi import BackgroundTasks, Depends, Form, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
 from candidates.cv_parser import parse_cv
-from core.embedder import embed
-from core.database import get_db
+from core.database import get_db, SessionLocal
 
 def sanitize_for_postgres(value):
     """Remove characters PostgreSQL cannot store in TEXT/VARCHAR/ARRAY fields."""
@@ -216,16 +216,76 @@ async def upload_candidate_cv(
         }
     )
 
+async def generate_candidate_embeddings_background(
+    candidate_id: str,
+    holistic_summary: str | None,
+    career_trajectory: str | None,
+    experience_block: str | None,
+) -> None:
+    try:
+        print(f"Background: generating embeddings for candidate {candidate_id}")
+
+        from core.embedder import embed
+
+        loop = asyncio.get_running_loop()
+
+        holistic_vec = None
+        career_vec = None
+        experience_vec = None
+
+        if holistic_summary:
+            holistic_vec = await loop.run_in_executor(None, embed, holistic_summary)
+
+        if career_trajectory:
+            career_vec = await loop.run_in_executor(None, embed, career_trajectory)
+
+        if experience_block:
+            experience_vec = await loop.run_in_executor(None, embed, experience_block)
+
+        holistic_vec_str = vec_to_str(holistic_vec)
+        career_vec_str = vec_to_str(career_vec)
+        experience_vec_str = vec_to_str(experience_vec)
+
+        update_sql = text(
+            f"""
+            UPDATE candidates
+            SET
+                holistic_vector = {f"'{holistic_vec_str}'::vector" if holistic_vec_str else "NULL"},
+                career_trajectory_vector = {f"'{career_vec_str}'::vector" if career_vec_str else "NULL"},
+                experience_vector = {f"'{experience_vec_str}'::vector" if experience_vec_str else "NULL"}
+            WHERE candidate_id = :candidate_id;
+            """
+        )
+
+        async with SessionLocal() as db:
+            await db.execute(update_sql, {"candidate_id": candidate_id})
+            await db.commit()
+
+        print(
+            "Background: vector update committed",
+            {
+                "candidate_id": candidate_id,
+                "has_holistic_vector": holistic_vec_str is not None,
+                "has_career_vector": career_vec_str is not None,
+                "has_experience_vector": experience_vec_str is not None,
+            },
+        )
+        
+        print(f"Background: embeddings completed for candidate {candidate_id}")
+
+    except Exception as e:
+        print(f"Background embedding error for candidate {candidate_id}: {e}")
 
 async def confirm_save_candidate_cv(
     request: ConfirmSaveRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     print("API: confirm-save endpoint called")
     
     candidate_data = sanitize_for_postgres(request.candidate_data.model_dump())
 
-    print("API: generating embeddings from edited candidate data")
+    print("API: saving candidate first; embeddings will run in background")
 
     holistic_vec = None
     career_vec = None
@@ -302,12 +362,20 @@ async def confirm_save_candidate_cv(
     await db.execute(sql, insert_values)
     await db.commit()
 
+    background_tasks.add_task(
+        generate_candidate_embeddings_background,
+        candidate_id,
+        insert_values["holistic_summary"],
+        insert_values["career_trajectory"],
+        insert_values["experience_block"],
+    )
+
     return JSONResponse(
         status_code=200,
         content={
             "success": True,
             "candidate_id": candidate_id,
-            "message": "Candidate saved and indexed successfully",
+            "message": "Candidate saved successfully. Embeddings are being generated in the background.",
             "candidate_data": {
                 "candidate_id": candidate_id,
                 "first_name": insert_values["first_name"],
@@ -335,92 +403,6 @@ async def confirm_save_candidate_cv(
             },
         },
     )
-
-    sql = text(
-        f"""
-        INSERT INTO candidates (
-            candidate_id,
-            first_name, last_name,
-            location_city, years_of_experience,
-            seniority_level,
-            salary_expectation_min, salary_expectation_max,
-            degree_level, is_technical_degree,
-            availability_status, degree_field_raw,
-            skills_primary, skills_secondary, skills_exposure,
-            job_titles_canonical, certifications,
-            business_domains, technical_domains,
-            holistic_summary_text, career_trajectory_text,
-            experience_block_text,
-            holistic_vector,
-            career_trajectory_vector,
-            experience_vector
-        ) VALUES (
-            :candidate_id,
-            :first_name, :last_name,
-            :location_city, :years_of_experience,
-            :seniority_level,
-            :salary_min, :salary_max,
-            :degree_level, :is_technical,
-            :availability, :degree_field,
-            :skills_primary, :skills_secondary, :skills_exposure,
-            :job_titles, :certifications,
-            :business_domains, :technical_domains,
-            :holistic_summary, :career_trajectory,
-            :experience_block,
-            {f"'{holistic_vec}'::vector" if holistic_vec else "NULL"},
-            {f"'{career_vec}'::vector" if career_vec else "NULL"},
-            {f"'{experience_vec}'::vector" if experience_vec else "NULL"}
-        )
-        RETURNING candidate_id;
-        """
-    )
-
-    await db.execute(sql, candidate_values)
-    await db.commit()
-
-    return JSONResponse(
-        status_code=200,
-        content={
-            "success": True,
-            "candidate_id": candidate_id,
-            "message": "CV parsed and candidate added successfully",
-            "parsed_fields": {
-                "name": f"{candidate_values['first_name']} {candidate_values['last_name']}".strip(),
-                "location": candidate_values['location_city'],
-                "yoe": candidate_values['years_of_experience'],
-                "seniority": candidate_values['seniority_level'],
-                "skills_count": len(candidate_values['skills_primary']),
-                "has_summary": candidate_values['holistic_summary'] is not None,
-                "has_vectors": parsed.holistic_vector is not None,
-            },
-            "candidate_data": {
-                "candidate_id": candidate_id,
-                "first_name": candidate_values['first_name'] or "Unknown",
-                "last_name": candidate_values['last_name'] or "",
-                "location_city": candidate_values['location_city'],
-                "years_of_experience": candidate_values['years_of_experience'],
-                "seniority_level": candidate_values['seniority_level'],
-                "salary_expectation_min": candidate_values['salary_min'],
-                "salary_expectation_max": candidate_values['salary_max'],
-                "job_titles_canonical": candidate_values['job_titles'] or [],
-                "skills_primary": candidate_values['skills_primary'] or [],
-                "skills_secondary": candidate_values['skills_secondary'] or [],
-                "skills_exposure": candidate_values['skills_exposure'] or [],
-                "business_domains": candidate_values['business_domains'] or [],
-                "technical_domains": candidate_values['technical_domains'] or [],
-                "certifications": candidate_values['certifications'] or [],
-                "degree_level": candidate_values['degree_level'],
-                "degree_field_raw": candidate_values['degree_field'],
-                "is_technical_degree": candidate_values['is_technical'],
-                "holistic_summary_text": candidate_values['holistic_summary'],
-                "career_trajectory_text": candidate_values['career_trajectory'],
-                "experience_block_text": candidate_values['experience_block'],
-                "availability_status": candidate_values['availability'],
-                "source": form_data.get("source", "Direct Application"),
-            },
-        },
-    )
-
 
 async def parse_preview_candidate_cv(
     file: UploadFile,
